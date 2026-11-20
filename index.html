@@ -64,7 +64,9 @@ svg text{fill:var(--mut);font-size:10px}
 nav button{flex:none;flex-direction:row;font-size:14px;gap:12px;padding:11px 14px;justify-content:flex-start}
 .logo{display:block}main{margin-left:230px;padding-bottom:40px}.sos{bottom:24px}.ov{align-items:center}.sheet{border-radius:8px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
-</style></head>
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script></head>
 <body><div id="app"><nav id="nav"></nav><main id="main"></main></div><div id="ov"></div><button class="sos" data-a="sos">SOS</button>
 <script>
 const $=s=>document.querySelector(s),K='offlust.v1';
@@ -72,7 +74,15 @@ const key=d=>{d=new Date(d);return d.getFullYear()+'-'+String(d.getMonth()+1).pa
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DEF=()=>({name:'',goal:'Construir hábitos que me fazem bem',monthly:20,start:key(new Date()),cycles:[],days:{},habits:[{id:1,n:'Acordar à hora definida',i:'⏰'},{id:2,n:'Fazer exercício',i:'💪'},{id:3,n:'Estudar',i:'📚'},{id:4,n:'Ler',i:'📖'},{id:5,n:'Evitar conteúdos desencadeantes',i:'🛡️'},{id:6,n:'Dormir a horas regulares',i:'🌙'}],hd:{},sos:[],cfg:{on:false,m:'08:00',r:'21:00'}});
 let S;try{S=Object.assign(DEF(),JSON.parse(localStorage.getItem(K)||'{}'))}catch(e){S=DEF()}
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const CFG=window.OFFLUST_CONFIG||{};
+const sb=(window.supabase&&CFG.url&&CFG.anonKey&&!CFG.url.includes('COLA'))?window.supabase.createClient(CFG.url,CFG.anonKey):null;
+let user=null,syncT=null,syncMsg='',pulled=null;
+const local=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+async function push(){if(!sb||!user)return;const{error}=await sb.from('app_state').upsert({user_id:user.id,data:S,updated_at:new Date().toISOString()});syncMsg=error?'Erro ao sincronizar: '+error.message:'Sincronizado às '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});if(page=='pf')render()}
+const save=()=>{local();clearTimeout(syncT);syncT=setTimeout(push,800)};
+async function pull(){const{data,error}=await sb.from('app_state').select('data').eq('user_id',user.id).maybeSingle();if(error){syncMsg='Erro: '+error.message;render();return}
+const has=data&&data.data&&Object.keys(data.data).length;
+if(has){const mine=Object.keys(S.days).length;if(mine&&!confirm('Esta conta já tem dados na nuvem. Usar os da nuvem? (Os dados locais deste aparelho serão substituídos.)')){await push();return}S=Object.assign(DEF(),data.data);local();syncMsg='Dados carregados da nuvem'}else await push();render()}
 let page='dash',cal=new Date(),sosS=null,tmr=null;
 const TODAY=()=>key(new Date());
 const ok=k=>S.days[k]&&S.days[k].ok===true;
@@ -95,6 +105,7 @@ function nav(){$('#nav').innerHTML='<div class="logo">OFF<b>LUST</b></div>'+NAV.
 function weekDays(){const a=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);a.push(d)}return a}
 function dayScore(k){return (ok(k)?50:0)+(S.hd[k]?Math.min(1,S.hd[k].length/S.habits.length)*50:0)}
 const P={};
+const acct=()=>!sb?`<div class="card"><h2>Conta (opcional)</h2><p class="mut">Modo local: os dados ficam só neste aparelho. Para ativar a conta e a sincronização, preenche o ficheiro config.js com os dados do Supabase.</p></div>`:user?`<div class="card"><h2>Conta</h2><p class="mut">Ligado como <b>${esc(user.email)}</b><br>${esc(syncMsg)}</p><br><button class="btn g" data-a="syncnow">Sincronizar agora</button> <button class="btn r" data-a="logout">Sair</button></div>`:`<div class="card"><h2>Conta (opcional)</h2><p class="mut">Sem conta tudo fica só neste aparelho. Com conta, os dados sincronizam entre aparelhos.</p><input id="em" type="email" placeholder="Email" autocomplete="email"><input id="pw" type="password" placeholder="Palavra-passe (mín. 6)" autocomplete="current-password"><button class="btn" data-a="login">Entrar</button> <button class="btn g" data-a="signup">Criar conta</button></div>`;
 P.dash=()=>{const st=streak(),mo=Object.keys(S.days).filter(k=>ok(k)&&k.slice(0,7)==TODAY().slice(0,7)).length,wk=weekDays().filter(d=>ok(key(d))).length,td=TODAY(),hd=(S.hd[td]||[]).length,L=xp()%150;
 return `<h1>Olá${S.name?', '+esc(S.name):''}</h1><p class="sub">${new Date().toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'})}</p>
 <div class="card quote c"><div class="big">${st}</div><div class="mut" style="margin:6px 0 10px">${st==1?'dia':'dias'} consecutivos · melhor ciclo: ${best()}</div><p><b>Um dia de cada vez. O teu progresso começa agora.</b></p><br><button class="btn" data-a="day" data-v="${td}">${S.days[td]?'Editar registo de hoje':'Registar hoje'}</button></div>
@@ -120,7 +131,7 @@ return `<h1>Estatísticas</h1><p class="sub">Padrões, não julgamentos.</p><div
 <div class="card"><h2>Uso do SOS (${S.sos.length})</h2>${bars(pd,pn,Math.max(...pd))}</div>
 <div class="card"><h2>Situações desencadeantes</h2>${tv.length?tv.map(t=>`<div class="item"><div class="t">${esc(t[0])}</div><b>${t[1]}</b></div>`).join(''):'<p class="mut">Ainda sem dados. Regista situações ao preencher o dia.</p>'}</div></div>`};
 P.pf=()=>`<h1>Perfil e definições</h1><p class="sub">Tudo fica guardado apenas neste dispositivo. Sem conta, sem partilha.</p>
-<div class="card"><h2>Pessoal</h2><label class="mut">Nome (opcional)</label><input id="pn" value="${esc(S.name)}"><label class="mut">O meu objetivo</label><textarea id="pg" rows="2">${esc(S.goal)}</textarea><label class="mut">Meta mensal (dias)</label><input id="pm" type="number" min="1" max="31" value="${S.monthly}"><button class="btn" data-a="savep">Guardar</button></div>
+${acct()}<div class="card"><h2>Pessoal</h2><label class="mut">Nome (opcional)</label><input id="pn" value="${esc(S.name)}"><label class="mut">O meu objetivo</label><textarea id="pg" rows="2">${esc(S.goal)}</textarea><label class="mut">Meta mensal (dias)</label><input id="pm" type="number" min="1" max="31" value="${S.monthly}"><button class="btn" data-a="savep">Guardar</button></div>
 <div class="card"><h2>Ciclos</h2><p class="mut">Reiniciar começa um novo ciclo e mantém todo o histórico. Recomeçar faz parte do processo.</p><br><button class="btn g" data-a="reset">Começar novo ciclo</button>${S.cycles.map(c=>`<div class="item"><div class="t">${c.start} → ${c.end}</div><span class="mut">melhor: ${c.best} dias</span></div>`).join('')}</div>
 <div class="card"><h2>Notificações</h2><p class="mut">Mensagens sempre gentis. Os avisos aparecem enquanto a app estiver aberta; para lembretes com a app fechada é preciso instalá-la como aplicação.</p><div class="item"><div class="t">Lembrete matinal</div><input type="time" id="nm" value="${S.cfg.m}" style="width:120px"></div><div class="item"><div class="t">Revisão diária</div><input type="time" id="nr" value="${S.cfg.r}" style="width:120px"></div><button class="btn" data-a="notif">${S.cfg.on?'Guardar horas':'Ativar notificações'}</button> <button class="btn g" data-a="ntest">Testar</button></div>
 <div class="card"><h2>Dados</h2><button class="btn g" data-a="exp">Exportar (JSON)</button> <button class="btn r" data-a="wipe">Apagar todo o histórico</button></div>`;
@@ -133,8 +144,12 @@ let h;if(s.st==0)h=`<h2>Respira. Estás a tempo.</h2><p class="mut">Vontade agor
 else if(s.st==1){const m=Math.floor(s.t/60),sc=String(s.t%60).padStart(2,'0'),e=300-s.t,p=e%14,ph=p<4?'Inspira':p<8?'Segura':'Expira';h=`<div class="timer">${m}:${sc}</div><div class="breath">${ph}</div><p class="c"><b>${MSG[s.m]}</b></p><p class="c mut">Se puderes, levanta-te e muda de espaço. Bebe água. Caminha um pouco.</p><br><div class="c"><button class="btn g" data-a="sosend">Terminar</button></div>`}
 else h=`<h2>Como te sentes agora?</h2><p class="mut">Vontade antes: ${s.b}/10. Fizeste algo por ti.</p><br>${[['😣','Pior'],['😐','Igual'],['🙂','Melhor'],['😌','Calmo'],['💪','Forte']].map((f,i)=>`<button class="pill" style="font-size:18px" data-a="sosf" data-v="${f[1]}">${f[0]} ${f[1]}</button>`).join('')}`;
 o.innerHTML=`<div class="ov"><div class="sheet">${h}</div></div>`}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('ov')&&e.target!==t)return;const a=t.dataset.a,v=t.dataset.v;
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('ov')&&e.target!==t)return;const a=t.dataset.a,v=t.dataset.v;
 switch(a){case'go':page=v;render();break;
+case'login':{const{error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)alert('Não foi possível entrar: '+error.message);break}
+case'signup':{const{data,error}=await sb.auth.signUp({email:$('#em').value.trim(),password:$('#pw').value});if(error)alert('Erro: '+error.message);else if(!data.session)alert('Conta criada. Confirma o email para poderes entrar.');break}
+case'logout':await sb.auth.signOut();break;
+case'syncnow':await push();break;
 case'close':$('#ov').innerHTML='';break;
 case'day':dayModal(v);break;
 case'okv':window._d.ok=v=='1';document.querySelectorAll('[data-a=okv]').forEach(b=>b.classList.toggle('on',(b.dataset.v=='1')==window._d.ok));break;
@@ -157,4 +172,5 @@ case'sosend':clearInterval(tmr);sosS.st=2;sosRender();break;
 case'sosf':S.sos.push({t:Date.now(),b:sosS.b,a:v});save();sosS=null;sosRender();render();break}});
 (function tick(){setInterval(()=>{if(!S.cfg.on||!('Notification' in window)||Notification.permission!='granted')return;const n=new Date(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');if(n.getSeconds()>5)return;if(hm==S.cfg.m)new Notification('OFFLUST',{body:'Bom dia! Hoje é mais um passo, sem pressa.'});if(hm==S.cfg.r)new Notification('OFFLUST',{body:'Hora da revisão do dia. Seja como for, regista com gentileza.'})},5000)})();
 render();
+if(sb)sb.auth.onAuthStateChange((_e,ses)=>{const u=ses&&ses.user||null;if(!u){user=null;pulled=null;render();return}user=u;if(pulled!==u.id){pulled=u.id;setTimeout(pull,0)}else render()});
 </script></body></html>
