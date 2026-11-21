@@ -26,3 +26,9 @@ Pronto: Perfil → Conta → Criar conta / Entrar.
 ## Notas
 - Os dados ficam numa tabela `app_state` (um JSON por utilizador), visíveis só para o próprio utilizador.
 - Não têm encriptação de ponta a ponta: o administrador do projeto Supabase consegue lê-los.
+
+## APK (PWABuilder)
+1. Faz deploy na Vercel (com a proteção de deployment desligada).
+2. pwabuilder.com → cola o endereço do site → Start.
+3. Package for stores → Android → escolhe APK (instalação direta) ou AAB (Play Store).
+4. Guarda o ficheiro de assinatura (keystore) que vem no zip.

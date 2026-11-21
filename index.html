@@ -66,7 +66,8 @@ nav button{flex:none;flex-direction:row;font-size:14px;gap:12px;padding:11px 14p
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script></head>
+<script src="config.js"></script>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#050505"><link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"></head>
 <body><div id="app"><nav id="nav"></nav><main id="main"></main></div><div id="ov"></div><button class="sos" data-a="sos">SOS</button>
 <script>
 const $=s=>document.querySelector(s),K='offlust.v1';
@@ -173,4 +174,5 @@ case'sosf':S.sos.push({t:Date.now(),b:sosS.b,a:v});save();sosS=null;sosRender();
 (function tick(){setInterval(()=>{if(!S.cfg.on||!('Notification' in window)||Notification.permission!='granted')return;const n=new Date(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');if(n.getSeconds()>5)return;if(hm==S.cfg.m)new Notification('OFFLUST',{body:'Bom dia! Hoje é mais um passo, sem pressa.'});if(hm==S.cfg.r)new Notification('OFFLUST',{body:'Hora da revisão do dia. Seja como for, regista com gentileza.'})},5000)})();
 render();
 if(sb)sb.auth.onAuthStateChange((_e,ses)=>{const u=ses&&ses.user||null;if(!u){user=null;pulled=null;render();return}user=u;if(pulled!==u.id){pulled=u.id;setTimeout(pull,0)}else render()});
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
