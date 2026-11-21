@@ -1,1 +1,9 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.offlust_git_main_kanji6.twa",
+        "sha256_cert_fingerprints": ["72:FF:02:58:78:EB:46:06:99:93:49:8D:B2:88:AC:FF:C9:FD:EA:B2:AD:11:0C:52:1A:78:57:8A:B2:4A:AD:42"]
+      }
+    }]
 
