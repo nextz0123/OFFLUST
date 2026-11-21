@@ -75,6 +75,7 @@ const key=d=>{d=new Date(d);return d.getFullYear()+'-'+String(d.getMonth()+1).pa
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const DEF=()=>({name:'',goal:'Construir hábitos que me fazem bem',monthly:20,start:key(new Date()),cycles:[],days:{},habits:[{id:1,n:'Acordar à hora definida',i:'⏰'},{id:2,n:'Fazer exercício',i:'💪'},{id:3,n:'Estudar',i:'📚'},{id:4,n:'Ler',i:'📖'},{id:5,n:'Evitar conteúdos desencadeantes',i:'🛡️'},{id:6,n:'Dormir a horas regulares',i:'🌙'}],hd:{},sos:[],cfg:{on:false,m:'08:00',r:'21:00'}});
 let S;try{S=Object.assign(DEF(),JSON.parse(localStorage.getItem(K)||'{}'))}catch(e){S=DEF()}
+if(!S.startAt)S.startAt=new Date(S.start+'T00:00').getTime();
 const CFG=window.OFFLUST_CONFIG||{};
 const sb=(window.supabase&&CFG.url&&CFG.anonKey&&!CFG.url.includes('COLA'))?window.supabase.createClient(CFG.url,CFG.anonKey):null;
 let user=null,syncT=null,syncMsg='',pulled=null;
@@ -106,10 +107,11 @@ function nav(){$('#nav').innerHTML='<div class="logo">OFF<b>LUST</b></div>'+NAV.
 function weekDays(){const a=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);a.push(d)}return a}
 function dayScore(k){return (ok(k)?50:0)+(S.hd[k]?Math.min(1,S.hd[k].length/S.habits.length)*50:0)}
 const P={};
+const fmt=ms=>{const s=Math.max(0,Math.floor(ms/1000)),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60,z=n=>String(n).padStart(2,'0');return d+'d '+z(h)+'h '+z(m)+'m '+z(x)+'s'};
 const acct=()=>!sb?`<div class="card"><h2>Conta (opcional)</h2><p class="mut">Modo local: os dados ficam só neste aparelho. Para ativar a conta e a sincronização, preenche o ficheiro config.js com os dados do Supabase.</p></div>`:user?`<div class="card"><h2>Conta</h2><p class="mut">Ligado como <b>${esc(user.email)}</b><br>${esc(syncMsg)}</p><br><button class="btn g" data-a="syncnow">Sincronizar agora</button> <button class="btn r" data-a="logout">Sair</button></div>`:`<div class="card"><h2>Conta (opcional)</h2><p class="mut">Sem conta tudo fica só neste aparelho. Com conta, os dados sincronizam entre aparelhos.</p><input id="em" type="email" placeholder="Email" autocomplete="email"><input id="pw" type="password" placeholder="Palavra-passe (mín. 6)" autocomplete="current-password"><button class="btn" data-a="login">Entrar</button> <button class="btn g" data-a="signup">Criar conta</button></div>`;
 P.dash=()=>{const st=streak(),mo=Object.keys(S.days).filter(k=>ok(k)&&k.slice(0,7)==TODAY().slice(0,7)).length,wk=weekDays().filter(d=>ok(key(d))).length,td=TODAY(),hd=(S.hd[td]||[]).length,L=xp()%150;
 return `<h1>Olá${S.name?', '+esc(S.name):''}</h1><p class="sub">${new Date().toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'})}</p>
-<div class="card quote c"><div class="big">${st}</div><div class="mut" style="margin:6px 0 10px">${st==1?'dia':'dias'} consecutivos · melhor ciclo: ${best()}</div><p><b>Um dia de cada vez. O teu progresso começa agora.</b></p><br><button class="btn" data-a="day" data-v="${td}">${S.days[td]?'Editar registo de hoje':'Registar hoje'}</button></div>
+<div class="card quote c"><div class="big">${st}</div><div id="live" style="font:500 22px Oswald,Impact,sans-serif;letter-spacing:.08em;margin:10px 0 0;color:var(--ac2)">${fmt(Date.now()-S.startAt)}</div><div class="mut" style="margin:0 0 4px">tempo neste ciclo</div><div class="mut" style="margin:6px 0 10px">${st==1?'dia':'dias'} consecutivos · melhor ciclo: ${best()}</div><p><b>Um dia de cada vez. O teu progresso começa agora.</b></p><br><button class="btn" data-a="day" data-v="${td}">${S.days[td]?'Editar registo de hoje':'Registar hoje'}</button></div>
 <div class="grid"><div class="card"><h2>Progresso semanal</h2>${bars(weekDays().map(d=>dayScore(key(d))),weekDays().map(d=>DS[d.getDay()][0]),100)}<p class="mut">${wk}/7 dias cumpridos</p></div>
 <div class="card"><h2>Objetivo mensal</h2><div class="big" style="font-size:36px">${mo}/${S.monthly}</div><div class="bar"><i style="width:${Math.min(100,mo/S.monthly*100)}%"></i></div><p class="mut">${esc(S.goal)}</p></div>
 <div class="card"><h2>Nível ${lvl()} · ${RK()}</h2><div class="bar"><i style="width:${L/150*100}%"></i></div><p class="mut">${xp()} XP · ${MED.filter(m=>m[2]()).length}/${MED.length} medalhas · ${hcount()} hábitos concluídos</p></div></div>
@@ -161,8 +163,8 @@ case'addh':{const n=$('#hn').value.trim();if(n){S.habits.push({id:Date.now(),n,i
 case'delh':if(confirm('Remover esta tarefa?')){S.habits=S.habits.filter(h=>h.id!=v);save();render()}break;
 case'cm':cal=new Date(cal.getFullYear(),cal.getMonth()+ +v,1);render();break;
 case'savep':S.name=$('#pn').value;S.goal=$('#pg').value;S.monthly=Math.max(1,+$('#pm').value||20);save();render();break;
-case'reset':if(confirm('Começar um novo ciclo? O histórico fica guardado.')){S.cycles.push({start:S.start,end:TODAY(),best:streak()});S.start=TODAY();save();render()}break;
-case'wipe':if(confirm('Apagar TODO o histórico? Não dá para desfazer.')){S=DEF();save();render()}break;
+case'reset':if(confirm('Começar um novo ciclo? O histórico fica guardado.')){S.cycles.push({start:S.start,end:TODAY(),best:streak()});S.start=TODAY();S.startAt=Date.now();save();render()}break;
+case'wipe':if(confirm('Apagar TODO o histórico? Não dá para desfazer.')){S=DEF();S.startAt=Date.now();save();render()}break;
 case'exp':{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='offlust.json';a.click();break}
 case'notif':S.cfg.m=$('#nm').value;S.cfg.r=$('#nr').value;if('Notification' in window)Notification.requestPermission().then(p=>{S.cfg.on=p=='granted';save();render()});else{S.cfg.on=true;save();render()}break;
 case'ntest':if('Notification' in window&&Notification.permission=='granted')new Notification('OFFLUST',{body:'Um dia de cada vez. Estás a fazer o teu melhor.'});else alert('Um dia de cada vez. Estás a fazer o teu melhor. (Ativa as notificações para as receber no sistema.)');break;
@@ -175,4 +177,5 @@ case'sosf':S.sos.push({t:Date.now(),b:sosS.b,a:v});save();sosS=null;sosRender();
 render();
 if(sb)sb.auth.onAuthStateChange((_e,ses)=>{const u=ses&&ses.user||null;if(!u){user=null;pulled=null;render();return}user=u;if(pulled!==u.id){pulled=u.id;setTimeout(pull,0)}else render()});
 if('serviceWorker' in navigator&&location.protocol.indexOf('http')==0)navigator.serviceWorker.register('sw.js').catch(()=>{});
+setInterval(()=>{const e=document.getElementById('live');if(e)e.textContent=fmt(Date.now()-S.startAt)},1000);
 </script></body></html>
